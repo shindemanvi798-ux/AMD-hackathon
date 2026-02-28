@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AquaWatch AI — Water Crisis Predictor</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#050e1a;--surface:#0a1828;--surface2:#0f2035;--border:#1a3a5c;
+    --accent:#00d4ff;--accent2:#0080ff;--warn:#ff9500;--danger:#ff3b3b;
+    --success:#00e676;--text:#e0f4ff;--muted:#5a8aaa;
+    --font-display:'Syne',sans-serif;--font-mono:'Space Mono',monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--text);font-family:var(--font-display);min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,212,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+  .container{max-width:1400px;margin:0 auto;padding:0 20px;position:relative;z-index:1;}
+  header{border-bottom:1px solid var(--border);padding:16px 0;position:sticky;top:0;background:rgba(5,14,26,0.92);backdrop-filter:blur(12px);z-index:100;}
+  .header-inner{display:flex;align-items:center;justify-content:space-between;}
+  .logo{display:flex;align-items:center;gap:12px;}
+  .logo-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 0 20px rgba(0,212,255,0.4);}
+  .logo-text{font-size:20px;font-weight:800;letter-spacing:-0.5px;background:linear-gradient(90deg,var(--accent),#fff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+  .logo-sub{font-size:11px;color:var(--muted);font-family:var(--font-mono);letter-spacing:2px;}
+  .header-right{display:flex;align-items:center;gap:16px;}
+  .live-badge{display:flex;align-items:center;gap:6px;background:rgba(0,230,118,0.1);border:1px solid rgba(0,230,118,0.3);border-radius:20px;padding:4px 12px;font-size:11px;font-family:var(--font-mono);color:var(--success);}
+  .live-dot{width:6px;height:6px;border-radius:50%;background:var(--success);animation:pulse 1.5s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.5;transform:scale(1.3);}}
+  .city-select{background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:var(--font-display);padding:6px 14px;border-radius:6px;font-size:13px;cursor:pointer;outline:none;}
+  .city-select:focus{border-color:var(--accent);}
+  .hero-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;padding:24px 0;}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;position:relative;overflow:hidden;transition:transform 0.2s,border-color 0.2s;animation:fadeUp 0.5s ease both;}
+  .stat-card:hover{transform:translateY(-2px);border-color:var(--accent);}
+  .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--card-accent,var(--accent));}
+  .stat-card.warn::before{--card-accent:var(--warn);}.stat-card.danger::before{--card-accent:var(--danger);}.stat-card.success::before{--card-accent:var(--success);}
+  .stat-label{font-size:11px;color:var(--muted);font-family:var(--font-mono);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;}
+  .stat-value{font-size:32px;font-weight:800;line-height:1;}
+  .stat-value.accent{color:var(--accent);}.stat-value.warn{color:var(--warn);}.stat-value.danger{color:var(--danger);}.stat-value.success{color:var(--success);}
+  .stat-change{font-size:12px;color:var(--muted);margin-top:6px;font-family:var(--font-mono);}
+  .stat-icon{position:absolute;right:20px;top:20px;font-size:28px;opacity:0.15;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
+  .main-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
+  .full-width{grid-column:1/-1;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;animation:fadeUp 0.5s ease both;}
+  .card-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+  .card-title{font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px;}
+  .card-title .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);}
+  .card-body{padding:20px;}
+  .chart-wrap{height:220px;position:relative;}
+  .area-table{width:100%;border-collapse:collapse;}
+  .area-table th{font-size:10px;font-family:var(--font-mono);letter-spacing:1px;color:var(--muted);text-transform:uppercase;text-align:left;padding:0 0 12px;}
+  .area-table td{padding:10px 0;border-top:1px solid var(--border);font-size:13px;}
+  .area-table tr:first-child td{border-top:none;}
+  .risk-bar-wrap{width:100px;}
+  .risk-bar{height:6px;border-radius:3px;background:var(--border);overflow:hidden;}
+  .risk-bar-fill{height:100%;border-radius:3px;background:var(--fill-color,var(--accent));transition:width 1s ease;}
+  .badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-family:var(--font-mono);font-weight:700;letter-spacing:0.5px;}
+  .badge.high{background:rgba(255,59,59,0.15);color:var(--danger);border:1px solid rgba(255,59,59,0.3);}
+  .badge.medium{background:rgba(255,149,0,0.15);color:var(--warn);border:1px solid rgba(255,149,0,0.3);}
+  .badge.low{background:rgba(0,230,118,0.1);color:var(--success);border:1px solid rgba(0,230,118,0.2);}
+  .alert-list{display:flex;flex-direction:column;gap:10px;}
+  .alert-item{display:flex;align-items:flex-start;gap:12px;background:var(--surface2);border-radius:8px;padding:12px 14px;border-left:3px solid var(--alert-color,var(--accent));animation:slideIn 0.4s ease both;}
+  @keyframes slideIn{from{opacity:0;transform:translateX(-10px);}to{opacity:1;transform:translateX(0);}}
+  .alert-item.critical{--alert-color:var(--danger);}.alert-item.warning{--alert-color:var(--warn);}.alert-item.info{--alert-color:var(--accent);}
+  .alert-icon{font-size:16px;margin-top:1px;}.alert-text{flex:1;}
+  .alert-title{font-size:13px;font-weight:600;margin-bottom:2px;}
+  .alert-desc{font-size:11px;color:var(--muted);font-family:var(--font-mono);}
+  .alert-time{font-size:10px;color:var(--muted);font-family:var(--font-mono);white-space:nowrap;}
+  .anomaly-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+  .anomaly-card{background:var(--surface2);border-radius:10px;padding:16px;border:1px solid var(--border);position:relative;}
+  .anomaly-card.flagged{border-color:rgba(255,59,59,0.4);background:rgba(255,59,59,0.05);}
+  .anomaly-card.flagged::after{content:'⚠ ANOMALY';position:absolute;top:8px;right:8px;font-size:9px;font-family:var(--font-mono);color:var(--danger);letter-spacing:1px;}
+  .anomaly-area{font-size:13px;font-weight:600;margin-bottom:6px;}
+  .anomaly-value{font-size:24px;font-weight:800;font-family:var(--font-mono);}
+  .anomaly-expected{font-size:11px;color:var(--muted);margin-top:4px;font-family:var(--font-mono);}
+  .anomaly-deviation{font-size:11px;margin-top:4px;font-weight:600;}
+  .prediction-row{display:flex;align-items:center;gap:16px;padding:12px 0;border-bottom:1px solid var(--border);}
+  .prediction-row:last-child{border-bottom:none;}
+  .pred-area{width:130px;font-size:13px;font-weight:600;}
+  .pred-bar-wrap{flex:1;}
+  .pred-bar{height:8px;border-radius:4px;background:var(--border);overflow:hidden;}
+  .pred-bar-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--accent2),var(--accent));transition:width 1.2s cubic-bezier(0.4,0,0.2,1);}
+  .pred-value{width:80px;text-align:right;font-size:13px;font-family:var(--font-mono);color:var(--accent);}
+  .leakage-map{position:relative;height:280px;background:var(--surface2);border-radius:8px;overflow:hidden;}
+  .map-label{position:absolute;font-size:10px;font-family:var(--font-mono);background:rgba(10,24,40,0.85);border:1px solid var(--border);border-radius:4px;padding:4px 8px;white-space:nowrap;}
+  .map-node{position:absolute;border-radius:50%;transform:translate(-50%,-50%);cursor:pointer;}
+  .map-node .ring{position:absolute;inset:-6px;border-radius:50%;border:2px solid currentColor;animation:expand 2s infinite;opacity:0;}
+  @keyframes expand{0%{transform:scale(0.8);opacity:0.8;}100%{transform:scale(1.8);opacity:0;}}
+  footer{border-top:1px solid var(--border);padding:20px 0;margin-top:24px;font-size:11px;color:var(--muted);font-family:var(--font-mono);}
+  @media(max-width:900px){.hero-stats{grid-template-columns:repeat(2,1fr);}.main-grid{grid-template-columns:1fr;}.anomaly-grid{grid-template-columns:repeat(2,1fr);}.full-width{grid-column:1;}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="header-inner">
+      <div class="logo">
+        <div class="logo-icon">💧</div>
+        <div>
+          <div class="logo-text">AquaWatch AI</div>
+          <div class="logo-sub" id="header-sub">PUNE WATER CRISIS PREDICTOR v1.0</div>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+        <select class="city-select" id="city-select" onchange="switchCity(this.value)">
+          <option value="Pune">📍 Pune, MH</option>
+          <option value="Mumbai">📍 Mumbai, MH</option>
+        </select>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+  <div class="hero-stats">
+    <div class="stat-card" style="animation-delay:0.1s">
+      <div class="stat-icon">🏙️</div>
+      <div class="stat-label">Daily Demand</div>
+      <div class="stat-value accent" id="stat-demand">—</div>
+      <div class="stat-change" id="stat-demand-sub">Loading...</div>
+    </div>
+    <div class="stat-card warn" style="animation-delay:0.2s">
+      <div class="stat-icon">🚰</div>
+      <div class="stat-label">Leakage Loss</div>
+      <div class="stat-value warn" id="stat-leakage">—</div>
+      <div class="stat-change" id="stat-leakage-sub">Loading...</div>
+    </div>
+    <div class="stat-card danger" style="animation-delay:0.3s">
+      <div class="stat-icon">⚠️</div>
+      <div class="stat-label">Active Alerts</div>
+      <div class="stat-value danger" id="stat-alerts">—</div>
+      <div class="stat-change" id="stat-alerts-sub">Loading...</div>
+    </div>
+    <div class="stat-card success" style="animation-delay:0.4s">
+      <div class="stat-icon">📊</div>
+      <div class="stat-label">Model Accuracy</div>
+      <div class="stat-value success">94.3%</div>
+      <div class="stat-change">IsolationForest + LR</div>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <div class="card" style="animation-delay:0.2s">
+      <div class="card-header">
+        <div class="card-title"><div class="dot"></div><span id="demand-chart-title">24-Hour Demand Forecast</span></div>
+        <span style="font-size:11px;color:var(--muted);font-family:var(--font-mono)">LINEAR REGRESSION MODEL</span>
+      </div>
+      <div class="card-body"><div class="chart-wrap"><canvas id="demandChart"></canvas></div></div>
+    </div>
+    <div class="card" style="animation-delay:0.3s">
+      <div class="card-header">
+        <div class="card-title"><div class="dot" style="background:var(--danger)"></div>Active Alerts</div>
+        <span style="font-size:11px;color:var(--muted);font-family:var(--font-mono)" id="alert-count">— TOTAL</span>
+      </div>
+      <div class="card-body" style="padding:16px"><div class="alert-list" id="alert-list"></div></div>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <div class="card" style="animation-delay:0.3s">
+      <div class="card-header">
+        <div class="card-title"><div class="dot" style="background:var(--accent2)"></div>Area-wise Demand Forecast</div>
+      </div>
+      <div class="card-body" style="padding:16px 20px"><div id="prediction-rows"></div></div>
+    </div>
+    <div class="card" style="animation-delay:0.4s">
+      <div class="card-header">
+        <div class="card-title"><div class="dot" style="background:var(--warn)"></div>Leakage Probability Map</div>
+        <span style="font-size:11px;color:var(--muted);font-family:var(--font-mono)">SIMULATED</span>
+      </div>
+      <div class="card-body"><div class="leakage-map" id="leakage-map"></div></div>
+    </div>
+  </div>
+
+  <div class="card full-width" style="animation-delay:0.4s;margin-bottom:16px">
+    <div class="card-header">
+      <div class="card-title"><div class="dot" style="background:var(--danger)"></div>Anomaly Detection — Abnormal Consumption</div>
+      <span style="font-size:11px;color:var(--muted);font-family:var(--font-mono)">ISOLATION FOREST · REAL-TIME</span>
+    </div>
+    <div class="card-body"><div class="anomaly-grid" id="anomaly-grid"></div></div>
+  </div>
+
+  <div class="card full-width" style="animation-delay:0.5s;margin-bottom:16px">
+    <div class="card-header">
+      <div class="card-title"><div class="dot" style="background:var(--warn)"></div><span id="trend-chart-title">7-Day Leakage & Demand Trend</span></div>
+    </div>
+    <div class="card-body"><div class="chart-wrap" style="height:200px"><canvas id="trendChart"></canvas></div></div>
+  </div>
+
+  <div class="card full-width" style="animation-delay:0.6s;margin-bottom:16px">
+    <div class="card-header">
+      <div class="card-title"><div class="dot"></div>Zone Risk Summary</div>
+    </div>
+    <div class="card-body">
+      <table class="area-table">
+        <thead><tr><th>Zone / Area</th><th>Demand (MLD)</th><th>Leakage Risk</th><th>Risk Level</th><th>Predicted (+24h)</th><th>Action</th></tr></thead>
+        <tbody id="area-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="container" style="display:flex;justify-content:space-between;width:100%">
+    <span>AquaWatch AI · Smart Cities Hackathon 2025</span>
+    <span id="footer-city">Model: IsolationForest + Linear Regression · Data: Synthetic (PMRDA / PMC)</span>
+  </div>
+</footer>
+
+<script>
+// ── PER-CITY DUMMY DATA ──────────────────────────────────────────
+const CITY_DATA = {
+  Pune: {
+    demand: 1420, leakage: 14.2, alerts: 4,
+    demandChange: "↑ +3.1% vs yesterday · MLD",
+    leakageChange: "↑ +0.8% · Critical in 1 zone",
+    alertsSub: "1 critical · 3 warnings",
+    footer: "Model: IsolationForest + Linear Regression · Data: Synthetic (PMRDA / PMC)",
+    demandCurve:  [65,55,48,45,50,58,80,120,155,175,182,190,185,180,175,172,175,170,165,155,140,118,95,75,68],
+    forecastCurve:[null,null,null,null,null,null,null,null,null,null,null,null,190,186,178,174,180,172,168,158,143,120,97,77,70],
+    trendDemand:  [138,142,139,148,151,145,142],
+    trendLeakage: [13.1,13.4,13.9,14.0,14.2,14.5,14.2],
+    areas: [
+      {name:'Pimpri',demand:240,leakage:62,risk:'high',pred:258},
+      {name:'Hadapsar',demand:180,leakage:45,risk:'medium',pred:190},
+      {name:'Aundh',demand:170,leakage:32,risk:'medium',pred:178},
+      {name:'Yerwada',demand:145,leakage:48,risk:'medium',pred:153},
+      {name:'Wanowrie',demand:150,leakage:38,risk:'medium',pred:157},
+      {name:'Kothrud',demand:160,leakage:20,risk:'low',pred:162},
+      {name:'Shivajinagar',demand:130,leakage:15,risk:'low',pred:132},
+      {name:'Swargate',demand:120,leakage:12,risk:'low',pred:122},
+    ],
+    alerts: [
+      {type:'critical',icon:'🚨',title:'Pipe Burst — Pimpri Main Line',desc:'Pressure drop 38% · Est. loss: 0.8 MLD/hr',time:'5m ago'},
+      {type:'warning',icon:'⚠️',title:'Demand Surge Predicted — Hadapsar',desc:'+24h forecast shows +16% demand spike',time:'18m ago'},
+      {type:'warning',icon:'⚠️',title:'Leakage >45% — Wanowrie',desc:'Model confidence: 87% · Inspection advised',time:'32m ago'},
+      {type:'info',icon:'ℹ️',title:'Maintenance — Kothrud Reservoir',desc:'Planned shutdown 01:00–05:00 · Rerouting active',time:'1h ago'},
+    ],
+    anomalies: [
+      {area:'Pimpri Industrial',value:198,expected:112,flagged:true},
+      {area:'Hadapsar East',value:94,expected:82,flagged:false},
+      {area:'Wanowrie Zone B',value:145,expected:95,flagged:true},
+      {area:'Kothrud Sector 3',value:61,expected:65,flagged:false},
+      {area:'Yerwada Camp',value:172,expected:105,flagged:true},
+      {area:'Shivajinagar CBD',value:48,expected:51,flagged:false},
+    ],
+    mapPositions:[{x:28,y:22},{x:60,y:55},{x:22,y:48},{x:72,y:38},{x:68,y:72},{x:35,y:60},{x:48,y:42},{x:50,y:75}]
+  },
+  Mumbai: {
+    demand: 3850, leakage: 18.7, alerts: 7,
+    demandChange: "↑ +4.2% vs yesterday · MLD",
+    leakageChange: "↑ +1.3% · Critical in 3 zones",
+    alertsSub: "3 critical · 4 warnings",
+    footer: "Model: IsolationForest + Linear Regression · Data: Synthetic (MCGM / BWSSB)",
+    demandCurve:  [180,160,145,140,148,160,200,280,360,410,430,450,440,430,420,415,420,410,400,380,350,310,260,220,185],
+    forecastCurve:[null,null,null,null,null,null,null,null,null,null,null,null,450,445,430,425,435,418,405,385,355,315,265,225,188],
+    trendDemand:  [382,391,378,405,412,398,385],
+    trendLeakage: [16.2,17.1,17.8,18.2,18.7,19.1,18.5],
+    areas: [
+      {name:'Dharavi',demand:420,leakage:68,risk:'high',pred:445},
+      {name:'Kurla',demand:450,leakage:71,risk:'high',pred:480},
+      {name:'Govandi',demand:380,leakage:55,risk:'high',pred:405},
+      {name:'Andheri East',demand:380,leakage:42,risk:'medium',pred:390},
+      {name:'Malad',demand:340,leakage:35,risk:'medium',pred:355},
+      {name:'Worli',demand:260,leakage:28,risk:'medium',pred:270},
+      {name:'Bandra',demand:310,leakage:22,risk:'low',pred:315},
+      {name:'Powai',demand:290,leakage:18,risk:'low',pred:295},
+    ],
+    alerts: [
+      {type:'critical',icon:'🚨',title:'Pipe Burst — Dharavi Main',desc:'Pressure drop 43% · Est. loss: 2.1 MLD/hr',time:'2m ago'},
+      {type:'critical',icon:'🚨',title:'Abnormal Consumption — Kurla',desc:'Usage 2.8x above 7-day baseline · Score: 0.94',time:'8m ago'},
+      {type:'critical',icon:'🚨',title:'Leakage >70% — Govandi',desc:'Model confidence: 91% · Action required',time:'15m ago'},
+      {type:'warning',icon:'⚠️',title:'Demand Surge — Andheri East',desc:'+24h forecast shows +18% demand spike',time:'22m ago'},
+      {type:'warning',icon:'⚠️',title:'Low Reservoir — Tank 7B',desc:'Currently at 31% capacity · Below threshold',time:'35m ago'},
+      {type:'info',icon:'ℹ️',title:'Maintenance — Bandra Pipeline',desc:'Planned shutdown 02:00–06:00 · Rerouting active',time:'1h ago'},
+      {type:'info',icon:'ℹ️',title:'Model Retrained Successfully',desc:'Accuracy improved: 92.1% → 94.3%',time:'3h ago'},
+    ],
+    anomalies: [
+      {area:'Dharavi Sector 4',value:142,expected:98,flagged:true},
+      {area:'Kurla Industrial',value:312,expected:112,flagged:true},
+      {area:'Govandi West',value:89,expected:95,flagged:false},
+      {area:'Andheri East',value:78,expected:72,flagged:false},
+      {area:'Malad Pump Stn',value:201,expected:120,flagged:true},
+      {area:'Worli Sea Face',value:45,expected:48,flagged:false},
+    ],
+    mapPositions:[{x:25,y:30},{x:55,y:20},{x:40,y:55},{x:65,y:65},{x:48,y:80},{x:80,y:75},{x:75,y:35},{x:20,y:70}]
+  }
+};
+
+// ── STATE ────────────────────────────────────────────────────────
+let currentCity = 'Pune';
+let demandChart = null;
+let trendChart  = null;
+
+// ── CHART HELPERS ────────────────────────────────────────────────
+function makeHours() {
+  const now = new Date(); const labels = [];
+  for (let i=-12;i<=12;i++){const h=(now.getHours()+i+24)%24;labels.push(`${String(h).padStart(2,'0')}:00`);}
+  return labels;
+}
+
+function buildDemandChart(city) {
+  const d = CITY_DATA[city];
+  const ctx = document.getElementById('demandChart').getContext('2d');
+  if (demandChart) demandChart.destroy();
+  demandChart = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels:makeHours(),
+      datasets:[
+        {label:'Actual Demand (MLD)',data:d.demandCurve.map((v,i)=>i<13?v+Math.random()*8-4:null),borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,0.08)',borderWidth:2,pointRadius:2,fill:true,tension:0.4},
+        {label:'AI Forecast',data:d.forecastCurve.map((v,i)=>i<12?null:(v?v+Math.random()*6-3:null)),borderColor:'#ff9500',borderWidth:2,borderDash:[6,3],pointRadius:2,backgroundColor:'rgba(255,149,0,0.06)',fill:true,tension:0.4}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#5a8aaa',font:{family:'Space Mono',size:10}}}},
+      scales:{
+        x:{ticks:{color:'#5a8aaa',font:{family:'Space Mono',size:9},maxTicksLimit:8},grid:{color:'rgba(255,255,255,0.04)'}},
+        y:{ticks:{color:'#5a8aaa',font:{family:'Space Mono',size:9}},grid:{color:'rgba(255,255,255,0.04)'}}
+      }
+    }
+  });
+}
+
+function buildTrendChart(city) {
+  const d = CITY_DATA[city];
+  const ctx = document.getElementById('trendChart').getContext('2d');
+  if (trendChart) trendChart.destroy();
+  trendChart = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+      datasets:[
+        {label:'Demand (MLD)',data:d.trendDemand,backgroundColor:'rgba(0,128,255,0.5)',borderRadius:4},
+        {label:'Leakage %',data:d.trendLeakage,backgroundColor:'rgba(255,149,0,0.5)',borderRadius:4,yAxisID:'y2'}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#5a8aaa',font:{family:'Space Mono',size:10}}}},
+      scales:{
+        x:{ticks:{color:'#5a8aaa'},grid:{color:'rgba(255,255,255,0.04)'}},
+        y:{ticks:{color:'#5a8aaa'},grid:{color:'rgba(255,255,255,0.04)'}},
+        y2:{position:'right',ticks:{color:'#ff9500'},grid:{display:false}}
+      }
+    }
+  });
+}
+
+// ── RENDER FUNCTIONS ─────────────────────────────────────────────
+function renderStats(d, city) {
+  document.getElementById('stat-demand').textContent  = d.demand.toLocaleString();
+  document.getElementById('stat-leakage').textContent = d.leakage + '%';
+  document.getElementById('stat-alerts').textContent  = d.alerts;
+  document.getElementById('alert-count').textContent  = d.alerts + ' TOTAL';
+  document.getElementById('stat-demand-sub').textContent  = d.demandChange;
+  document.getElementById('stat-leakage-sub').textContent = d.leakageChange;
+  document.getElementById('stat-alerts-sub').textContent  = d.alertsSub;
+  document.getElementById('header-sub').textContent = `${city.toUpperCase()} WATER CRISIS PREDICTOR v1.0`;
+  document.getElementById('demand-chart-title').textContent = `24-Hour Demand Forecast — ${city}`;
+  document.getElementById('trend-chart-title').textContent  = `7-Day Leakage & Demand Trend — ${city}`;
+  document.getElementById('footer-city').textContent = d.footer;
+}
+
+function renderAlerts(alerts) {
+  if (!alerts || !Array.isArray(alerts)) return;
+  document.getElementById('alert-list').innerHTML = alerts.map((a,i) => {
+    const type  = a.type  || 'info';
+    const icon  = a.icon  || 'ℹ️';
+    const title = a.title || 'Alert';
+    const desc  = a.desc  || '';
+    const time  = a.time  || '';
+    return `
+    <div class="alert-item ${type}" style="animation-delay:${i*0.08}s">
+      <div class="alert-icon">${icon}</div>
+      <div class="alert-text"><div class="alert-title">${title}</div><div class="alert-desc">${desc}</div></div>
+      <div class="alert-time">${time}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderAnomalies(anomalies) {
+  document.getElementById('anomaly-grid').innerHTML = anomalies.map(a=>{
+    const pct=Math.round(((a.value-a.expected)/a.expected)*100);
+    const sign=pct>=0?'+':'';
+    const color=a.flagged?'var(--danger)':'var(--success)';
+    return `<div class="anomaly-card ${a.flagged?'flagged':''}">
+      <div class="anomaly-area">${a.area}</div>
+      <div class="anomaly-value" style="color:${color}">${a.value} <span style="font-size:13px;color:var(--muted)">kL/h</span></div>
+      <div class="anomaly-expected">Expected: ${a.expected} kL/h</div>
+      <div class="anomaly-deviation" style="color:${color}">${sign}${pct}% deviation ${a.flagged?'🔴':'✅'}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderPredictions(areas) {
+  const max=Math.max(...areas.map(a=>a.pred));
+  document.getElementById('prediction-rows').innerHTML = areas.map(a=>`
+    <div class="prediction-row">
+      <div class="pred-area">${a.name}</div>
+      <div class="pred-bar-wrap"><div class="pred-bar"><div class="pred-bar-fill" style="width:${(a.pred/max*100).toFixed(1)}%"></div></div></div>
+      <div class="pred-value">${a.pred} MLD</div>
+    </div>`).join('');
+}
+
+function renderAreaTable(areas) {
+  document.getElementById('area-tbody').innerHTML = areas.map(a=>{
+    const rc=a.risk==='high'?'var(--danger)':a.risk==='medium'?'var(--warn)':'var(--success)';
+    return `<tr>
+      <td><strong>${a.name}</strong></td>
+      <td style="font-family:var(--font-mono)">${a.demand}</td>
+      <td><div class="risk-bar-wrap"><div style="font-size:11px;font-family:var(--font-mono);color:${rc};margin-bottom:4px">${a.leakage}%</div><div class="risk-bar"><div class="risk-bar-fill" style="width:${a.leakage}%;--fill-color:${rc}"></div></div></div></td>
+      <td><span class="badge ${a.risk}">${a.risk.toUpperCase()}</span></td>
+      <td style="font-family:var(--font-mono);color:var(--accent)">${a.pred} MLD</td>
+      <td style="font-size:12px;color:var(--muted)">${a.risk==='high'?'🔧 Inspect Now':a.risk==='medium'?'📋 Monitor':'✅ Normal'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderLeakageMap(areas, positions) {
+  const map=document.getElementById('leakage-map');
+  map.innerHTML=areas.map((a,i)=>{
+    const pos=positions[i]||{x:50,y:50};
+    const color=a.risk==='high'?'#ff3b3b':a.risk==='medium'?'#ff9500':'#00e676';
+    const size=10+a.leakage*0.22;
+    return `<div class="map-node" style="left:${pos.x}%;top:${pos.y}%;width:${size}px;height:${size}px;background:${color};color:${color}"><div class="ring"></div></div>
+      <div class="map-label" style="left:${Math.min(pos.x+2,68)}%;top:${Math.min(pos.y+4,88)}%">${a.name} · ${a.leakage}%</div>`;
+  }).join('')+`<div style="position:absolute;bottom:10px;left:10px;display:flex;gap:12px;font-size:10px;font-family:var(--font-mono);color:var(--muted)">
+    <span><span style="color:var(--danger)">●</span> HIGH</span>
+    <span><span style="color:var(--warn)">●</span> MEDIUM</span>
+    <span><span style="color:var(--success)">●</span> LOW</span></div>`;
+}
+
+// ── API + LOAD ───────────────────────────────────────────────────
+const API_BASE = 'http://localhost:5000';
+
+async function fetchFromAPI(endpoint) {
+  try {
+    const res  = await fetch(`${API_BASE}${endpoint}`);
+    const json = await res.json();
+    return json.success ? json.data : null;
+  } catch { return null; }
+}
+
+async function loadCity(city) {
+  const d = CITY_DATA[city];
+  renderStats(d, city);
+  buildDemandChart(city);
+  buildTrendChart(city);
+
+  // Try API, fall back to local dummy data
+  const [summary, areas, alertsData, anomaliesData] = await Promise.all([
+    fetchFromAPI(`/api/summary?city=${city}`),
+    fetchFromAPI(`/api/areas?city=${city}`),
+    fetchFromAPI(`/api/alerts?city=${city}`),
+    fetchFromAPI(`/api/anomalies?city=${city}`),
+  ]);
+
+  if (summary) {
+    document.getElementById('stat-demand').textContent  = summary.total_demand_mld.toLocaleString();
+    document.getElementById('stat-leakage').textContent = summary.avg_leakage_pct + '%';
+    document.getElementById('stat-alerts').textContent  = summary.active_alerts;
+    document.getElementById('alert-count').textContent  = summary.active_alerts + ' TOTAL';
+  }
+
+  renderPredictions(areas || d.areas);
+  renderAreaTable(areas || d.areas);
+  renderLeakageMap(areas || d.areas, d.mapPositions);
+  renderAlerts(alertsData || d.alerts);
+  renderAnomalies(anomaliesData || d.anomalies);
+}
+
+function switchCity(city) {
+  currentCity = city;
+  loadCity(city);
+}
+
+// Init
+loadCity(currentCity);
+setInterval(() => loadCity(currentCity), 30000);
+
+// Live demand ticker
+setInterval(() => {
+  const v = document.getElementById('stat-demand');
+  const cur = parseFloat(v.textContent.replace(',',''));
+  if (!isNaN(cur)) v.textContent = (cur + (Math.random()*0.4-0.2)).toFixed(1);
+}, 3000);
+</script>
+</body>
+</html>
